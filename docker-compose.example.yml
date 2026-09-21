@@ -1,0 +1,10 @@
+# Copy to docker-compose.yml, or run as-is:
+#   docker compose -f docker-compose.example.yml up -d --build
+# No secrets go here: each viewer pastes their GitHub token into the app, and it stays in their browser.
+services:
+  pullboard:
+    build: .
+    image: rivo-pullboard
+    ports:
+      - "8080:80"
+    restart: unless-stopped

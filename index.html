@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The token lives in localStorage, so the page may only talk to itself and GitHub. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self' https://api.github.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'"
+    />
+    <title>Pullboard</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ground: #f4f6f8;
+        --surface: #ffffff;
+        --sunk: #ebeef2;
+        --ink: #15191f;
+        --muted: #5a6371;
+        --line: #d9dee5;
+        --accent: #0b6e68;
+        --accent-soft: #dcefec;
+        --on-accent: #ffffff;
+        --pass: #1f8544; --pass-bg: #e0f2e6;
+        --fail: #c4323a; --fail-bg: #fae4e5;
+        --run: #9e6a00; --run-bg: #fbefd3;
+        --none: #737c89; --none-bg: #e9ecf0;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font: 400 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ground: #0e1115; --surface: #161a20; --sunk: #1b2027; --ink: #e4e8ed;
+          --muted: #98a2af; --line: #2a313a; --accent: #4cc3b7; --accent-soft: #11332f; --on-accent: #0e1115;
+          --pass: #50c57a; --pass-bg: #14301e; --fail: #f06b70; --fail-bg: #3a1a1d;
+          --run: #e2b44c; --run-bg: #35280e; --none: #8e98a5; --none-bg: #232930;
+        }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--ground); color: var(--ink); }
+      a { color: inherit; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      code { font-family: var(--mono); font-size: 0.9em; }
+
+      /* Status marks, shared by the Board and Runs views. */
+      .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 999px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+      .s { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 10.5px; font-weight: 700; line-height: 1; flex: none; }
+      .pass { color: var(--pass); } .pass.chip, .pass.s { background: var(--pass-bg); }
+      .fail { color: var(--fail); } .fail.chip, .fail.s { background: var(--fail-bg); }
+      .run { color: var(--run); } .run.chip, .run.s { background: var(--run-bg); }
+      .none { color: var(--none); } .none.chip, .none.s { background: var(--none-bg); }
+      .queued { color: var(--run); } .queued.chip { box-shadow: inset 0 0 0 1.5px var(--run-bg); }
+      .s.queued { box-shadow: inset 0 0 0 1.5px currentColor; }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.6s ease-in-out infinite; }
+      @keyframes pulse { 50% { opacity: 0.3; } }
+      @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+
+      .empty { color: var(--muted); margin: 0; padding: 10px 12px; }
+      .err { color: var(--fail); background: var(--fail-bg); border-radius: 6px; margin: 0; padding: 10px 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
