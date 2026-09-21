@@ -1,7 +1,7 @@
 # Pullboard
 
 Watches open PRs (with CI status) and GitHub Actions runs across repos you group into categories.
-Board: one row per category, one column per repo, one card per open PR. Runs: queued and in-progress runs, plus the last 10 finished.
+Board: one row per category, one column per repo, one card per open PR, plus a collapsible list of the last 5 merged or closed PRs. Runs: queued and in-progress runs, plus the last 10 finished.
 
 It runs entirely in the browser. Your token is kept in that browser's localStorage and is sent only to api.github.com.
 

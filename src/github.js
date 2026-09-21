@@ -48,6 +48,9 @@ const PRS = `pullRequests(states: OPEN, first: 50, orderBy: {field: UPDATED_AT, 
       author { login }
       commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
     }
+  }
+  closed: pullRequests(states: [CLOSED, MERGED], first: 10, orderBy: {field: UPDATED_AT, direction: DESC}) {
+    nodes { number title url state closedAt author { login } }
   }`;
 
 // One aliased field per repo (r0, r1, ...) so the whole board is one request.
@@ -60,7 +63,7 @@ export function boardQuery(repos) {
   return `query {\n${fields.join('\n')}\n}`;
 }
 
-// -> { "owner/repo": { total, prs: [...] } | { error } }
+// -> { "owner/repo": { total, prs: [...], closed: [...] } | { error } }
 export function mapBoard(repos, body) {
   if (!body.data) throw new Error(body.errors?.[0]?.message ?? 'GitHub returned no data.');
   return Object.fromEntries(
@@ -79,7 +82,19 @@ export function mapBoard(repos, body) {
         author: n.author?.login ?? 'ghost',
         ci: CI[n.commits.nodes[0]?.commit.statusCheckRollup?.state] ?? 'none',
       }));
-      return [repo, { total: r.pullRequests.totalCount, prs }];
+      // GitHub can't order PRs by close time, so take the 10 most recently active closed ones and keep the 5 closed last.
+      const closed = r.closed.nodes
+        .map((n) => ({
+          number: n.number,
+          title: n.title,
+          url: n.url,
+          merged: n.state === 'MERGED',
+          closedAt: n.closedAt,
+          author: n.author?.login ?? 'ghost',
+        }))
+        .sort((a, b) => b.closedAt.localeCompare(a.closedAt))
+        .slice(0, 5);
+      return [repo, { total: r.pullRequests.totalCount, prs, closed }];
     }),
   );
 }
