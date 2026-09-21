@@ -25,6 +25,7 @@
         --fail: #c4323a; --fail-bg: #fae4e5;
         --run: #9e6a00; --run-bg: #fbefd3;
         --none: #737c89; --none-bg: #e9ecf0;
+        --merged: #7446c9; --merged-bg: #eee7fb;
         --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font: 400 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       }
@@ -34,6 +35,7 @@
           --muted: #98a2af; --line: #2a313a; --accent: #4cc3b7; --accent-soft: #11332f; --on-accent: #0e1115;
           --pass: #50c57a; --pass-bg: #14301e; --fail: #f06b70; --fail-bg: #3a1a1d;
           --run: #e2b44c; --run-bg: #35280e; --none: #8e98a5; --none-bg: #232930;
+          --merged: #b595f5; --merged-bg: #2a2140;
         }
       }
       * { box-sizing: border-box; }
@@ -50,6 +52,7 @@
       .fail { color: var(--fail); } .fail.chip, .fail.s { background: var(--fail-bg); }
       .run { color: var(--run); } .run.chip, .run.s { background: var(--run-bg); }
       .none { color: var(--none); } .none.chip, .none.s { background: var(--none-bg); }
+      .merged { color: var(--merged); } .merged.s { background: var(--merged-bg); }
       .queued { color: var(--run); } .queued.chip { box-shadow: inset 0 0 0 1.5px var(--run-bg); }
       .s.queued { box-shadow: inset 0 0 0 1.5px currentColor; }
       .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.6s ease-in-out infinite; }

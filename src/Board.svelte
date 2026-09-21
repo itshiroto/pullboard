@@ -23,7 +23,7 @@
   {@const s = stats(cat.repos)}
   <details class="cat" open>
     <summary>
-      <span class="caret" aria-hidden="true">▸</span>
+      <span class="caret" aria-hidden="true"></span>
       <span class="name">{cat.name}</span>
       <span class="sum">
         {cat.repos.length} {cat.repos.length === 1 ? 'repo' : 'repos'} · {s.open} open{#if s.fail}&nbsp;· <b>{s.fail} failing</b>{/if}{#if s.broken}&nbsp;· <b>{s.broken} can't be read</b>{/if}
@@ -61,6 +61,23 @@
               {/each}
             </ul>
           {/if}
+          {#if d?.closed?.length}
+            <details class="closed">
+              <summary><span class="caret" aria-hidden="true"></span>Recently closed · {d.closed.length}</summary>
+              <ul class="cards">
+                {#each d.closed as pr}
+                  <li class="card">
+                    <span class="s {pr.merged ? 'merged' : 'none'}" title={pr.merged ? 'Merged' : 'Closed without merging'}
+                      aria-label={pr.merged ? 'Merged' : 'Closed without merging'}>{pr.merged ? '✓' : '✕'}</span>
+                    <div>
+                      <a class="t" href={pr.url} target="_blank" rel="noreferrer">{pr.title}</a>
+                      <div class="m">#{pr.number} · @{pr.author} · {pr.merged ? 'merged' : 'closed'} {ago(pr.closedAt, now)}</div>
+                    </div>
+                  </li>
+                {/each}
+              </ul>
+            </details>
+          {/if}
         </section>
       {/each}
     </div>
@@ -69,11 +86,13 @@
 
 <style>
   .cat + .cat { border-top: 1px solid var(--line); }
-  summary { list-style: none; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; padding: 12px 16px; cursor: pointer; }
+  summary { list-style: none; cursor: pointer; }
   summary::-webkit-details-marker { display: none; }
-  .cat[open] summary { padding-bottom: 2px; }
-  .caret { display: inline-block; width: 14px; font-size: 14px; color: var(--muted); transition: transform 0.15s; }
-  .cat[open] .caret { transform: rotate(90deg); }
+  .cat > summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; padding: 12px 16px; }
+  .cat[open] > summary { padding-bottom: 2px; }
+  /* Chevron drawn with two borders: points right when collapsed, down when open. */
+  .caret { flex: none; align-self: center; width: 9px; height: 9px; margin: 0 3px 3px 2px; border: solid var(--muted); border-width: 0 2.5px 2.5px 0; transform: rotate(-45deg); transition: transform 0.15s; }
+  [open] > summary .caret { transform: rotate(45deg); }
   .name { font-size: 15px; font-weight: 700; }
   .sum { font-size: 12.5px; color: var(--muted); }
   .sum b, .count b { color: var(--fail); font-weight: 600; }
@@ -85,13 +104,20 @@
   .count { font-size: 12px; color: var(--muted); margin-left: auto; white-space: nowrap; }
   .col > .err, .col > .empty { margin: 4px 8px 0; }
 
-  /* Columns stop growing so one busy repo doesn't stretch its row; the cards scroll instead. */
-  .cards { list-style: none; margin: 0; padding: 4px 8px 0; display: grid; gap: 8px; max-height: 60vh; overflow-y: auto; }
+  /* Columns stop growing so one busy repo doesn't stretch its row; the cards scroll instead.
+     520px keeps at least 4 cards in view on short screens, even with 3-line titles and a wrapped meta line. */
+  .cards { list-style: none; margin: 0; padding: 4px 8px 0; display: grid; gap: 8px; max-height: max(60vh, 520px); overflow-y: auto; }
   .card { display: grid; grid-template-columns: 18px 1fr; gap: 9px; padding: 9px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
   .card .s:hover { text-decoration: none; }
   .card.draft { opacity: 0.62; }
   .t { font-size: 13.5px; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere; }
   .m { font: 11.5px/1.4 var(--mono); color: var(--muted); margin-top: 3px; }
+  /* Closed PRs are history: flatter cards under a small label. */
+  .closed > summary { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 12px 12px 2px; }
+  .closed .caret { width: 7px; height: 7px; border-width: 0 2px 2px 0; margin: 0 1px 2px 2px; }
+  .closed .cards { max-height: none; }
+  .closed .card { background: transparent; }
+  .closed .t { font-weight: 400; color: var(--muted); }
   .tag { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; margin-left: 4px; vertical-align: 1px; }
   @media (prefers-reduced-motion: reduce) { .caret { transition: none; } }
 </style>

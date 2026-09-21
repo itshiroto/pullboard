@@ -20,15 +20,20 @@ test('a repo in two categories is queried once', () => {
   assert.match(q, /r1: repository\(owner: "acme", name: "web"\)/);
 });
 
-test('maps aliases back to repos, keeps per-repo errors, maps CI states', () => {
+test('maps aliases back to repos, keeps per-repo errors, maps CI states, keeps the 5 closed last', () => {
   const pr = (number, state) => ({
     number, title: `PR ${number}`, url: 'https://github.com/acme/api/pull/1', isDraft: false,
     updatedAt: '2026-09-01T00:00:00Z', author: number ? { login: 'mira' } : null,
     commits: { nodes: [{ commit: { statusCheckRollup: state && { state } } }] },
   });
   const states = ['SUCCESS', 'FAILURE', 'ERROR', 'PENDING', 'EXPECTED', null];
+  // Returned by last activity; day = close date.
+  const closed = [3, 9, 1, 7, 5, 8].map((day, i) => ({
+    number: day, title: `Closed ${day}`, url: 'u', state: i === 1 ? 'CLOSED' : 'MERGED',
+    closedAt: `2026-09-0${day}T00:00:00Z`, author: { login: 'mira' },
+  }));
   const body = {
-    data: { r0: null, r1: { pullRequests: { totalCount: 51, nodes: states.map((s, i) => pr(i, s)) } } },
+    data: { r0: null, r1: { pullRequests: { totalCount: 51, nodes: states.map((s, i) => pr(i, s)) }, closed: { nodes: closed } } },
     errors: [{ type: 'NOT_FOUND', path: ['r0'], message: 'Could not resolve to a Repository' }],
   };
   const out = mapBoard(['acme/legacy', 'acme/api'], body);
@@ -36,6 +41,8 @@ test('maps aliases back to repos, keeps per-repo errors, maps CI states', () => 
   assert.equal(out['acme/api'].total, 51);
   assert.deepEqual(out['acme/api'].prs.map((p) => p.ci), ['pass', 'fail', 'fail', 'run', 'run', 'none']);
   assert.equal(out['acme/api'].prs[0].author, 'ghost');
+  assert.deepEqual(out['acme/api'].closed.map((p) => p.number), [9, 8, 7, 5, 3]);
+  assert.deepEqual(out['acme/api'].closed.map((p) => p.merged), [false, true, true, true, true]);
   assert.throws(() => mapBoard(['acme/api'], { errors: [{ message: 'API rate limit exceeded' }] }), /rate limit/);
 });
 
