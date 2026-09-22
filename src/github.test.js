@@ -22,7 +22,7 @@ test('a repo in two categories is queried once', () => {
 
 test('maps aliases back to repos, keeps per-repo errors, maps CI states, keeps the 5 closed last', () => {
   const pr = (number, state) => ({
-    number, title: `PR ${number}`, url: 'https://github.com/acme/api/pull/1', isDraft: false,
+    number, title: `PR ${number}`, url: 'https://github.com/acme/api/pull/1', isDraft: false, baseRefName: 'main', headRefName: `feat-${number}`,
     updatedAt: '2026-09-01T00:00:00Z', author: number ? { login: 'mira' } : null,
     commits: { nodes: [{ commit: { statusCheckRollup: state && { state } } }] },
   });
@@ -30,7 +30,7 @@ test('maps aliases back to repos, keeps per-repo errors, maps CI states, keeps t
   // Returned by last activity; day = close date.
   const closed = [3, 9, 1, 7, 5, 8].map((day, i) => ({
     number: day, title: `Closed ${day}`, url: 'u', state: i === 1 ? 'CLOSED' : 'MERGED',
-    closedAt: `2026-09-0${day}T00:00:00Z`, author: { login: 'mira' },
+    closedAt: `2026-09-0${day}T00:00:00Z`, author: { login: 'mira' }, baseRefName: 'main', headRefName: `fix-${day}`,
   }));
   const body = {
     data: { r0: null, r1: { pullRequests: { totalCount: 51, nodes: states.map((s, i) => pr(i, s)) }, closed: { nodes: closed } } },
@@ -43,6 +43,8 @@ test('maps aliases back to repos, keeps per-repo errors, maps CI states, keeps t
   assert.equal(out['acme/api'].prs[0].author, 'ghost');
   assert.deepEqual(out['acme/api'].closed.map((p) => p.number), [9, 8, 7, 5, 3]);
   assert.deepEqual(out['acme/api'].closed.map((p) => p.merged), [false, true, true, true, true]);
+  assert.deepEqual([out['acme/api'].prs[1].base, out['acme/api'].prs[1].head], ['main', 'feat-1']);
+  assert.equal(out['acme/api'].closed[0].head, 'fix-9');
   assert.throws(() => mapBoard(['acme/api'], { errors: [{ message: 'API rate limit exceeded' }] }), /rate limit/);
 });
 

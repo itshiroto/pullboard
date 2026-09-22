@@ -56,6 +56,7 @@
                     <a class="t" href={pr.url} target="_blank" rel="noreferrer">{pr.title}</a>
                     {#if pr.draft}<span class="tag">Draft</span>{/if}
                     <div class="m">#{pr.number} · @{pr.author} · {ago(pr.updatedAt, now)}</div>
+                    <div class="m br" title="{pr.head} into {pr.base}">{pr.base} ← {pr.head}</div>
                   </div>
                 </li>
               {/each}
@@ -72,6 +73,7 @@
                     <div>
                       <a class="t" href={pr.url} target="_blank" rel="noreferrer">{pr.title}</a>
                       <div class="m">#{pr.number} · @{pr.author} · {pr.merged ? 'merged' : 'closed'} {ago(pr.closedAt, now)}</div>
+                      <div class="m br" title="{pr.head} into {pr.base}">{pr.base} ← {pr.head}</div>
                     </div>
                   </li>
                 {/each}
@@ -118,6 +120,7 @@
   .closed .cards { max-height: none; }
   .closed .card { background: transparent; }
   .closed .t { font-weight: 400; color: var(--muted); }
+  .br { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
   .tag { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; margin-left: 4px; vertical-align: 1px; }
   @media (prefers-reduced-motion: reduce) { .caret { transition: none; } }
 </style>

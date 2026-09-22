@@ -44,13 +44,13 @@ async function gh(token, path, init = {}) {
 const PRS = `pullRequests(states: OPEN, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
     totalCount
     nodes {
-      number title url isDraft updatedAt
+      number title url isDraft updatedAt baseRefName headRefName
       author { login }
       commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
     }
   }
   closed: pullRequests(states: [CLOSED, MERGED], first: 10, orderBy: {field: UPDATED_AT, direction: DESC}) {
-    nodes { number title url state closedAt author { login } }
+    nodes { number title url state closedAt baseRefName headRefName author { login } }
   }`;
 
 // One aliased field per repo (r0, r1, ...) so the whole board is one request.
@@ -80,6 +80,8 @@ export function mapBoard(repos, body) {
         draft: n.isDraft,
         updatedAt: n.updatedAt,
         author: n.author?.login ?? 'ghost',
+        base: n.baseRefName,
+        head: n.headRefName,
         ci: CI[n.commits.nodes[0]?.commit.statusCheckRollup?.state] ?? 'none',
       }));
       // GitHub can't order PRs by close time, so take the 10 most recently active closed ones and keep the 5 closed last.
@@ -91,6 +93,8 @@ export function mapBoard(repos, body) {
           merged: n.state === 'MERGED',
           closedAt: n.closedAt,
           author: n.author?.login ?? 'ghost',
+          base: n.baseRefName,
+          head: n.headRefName,
         }))
         .sort((a, b) => b.closedAt.localeCompare(a.closedAt))
         .slice(0, 5);
