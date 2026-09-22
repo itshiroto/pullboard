@@ -1,9 +1,7 @@
 # Pullboard
+tl;dr: I'm working on three repos for my work, and i'm too lazy to open many PR tabs for each repos. Therefore, this exists :D
 
-Watches open PRs (with CI status) and GitHub Actions runs across repos you group into categories.
-Board: one row per category, one column per repo, one card per open PR, plus a collapsible list of the last 5 merged or closed PRs. Runs: queued and in-progress runs, plus the last 10 finished.
-
-It runs entirely in the browser. Your token is kept in that browser's localStorage and is sent only to api.github.com.
+<img width="2925" height="2038" alt="Screenshot 2026-09-22 at 09 24 29" src="https://github.com/user-attachments/assets/0e281428-c8c6-406b-b0c8-1c2f2950efc0" />
 
 ## Develop
 
