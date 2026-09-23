@@ -100,7 +100,7 @@
   .sum b, .count b { color: var(--fail); font-weight: 600; }
 
   .row { display: flex; gap: 12px; padding: 10px 16px 16px; overflow-x: auto; align-items: flex-start; }
-  .col { flex: 0 0 288px; background: var(--sunk); border-radius: 8px; padding-bottom: 8px; }
+  .col { flex: 0 0 288px; min-width: 0; background: var(--sunk); border-radius: 8px; padding-bottom: 8px; }
   .col header { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px 6px; }
   .repo { font: 500 13px/1.3 var(--mono); overflow-wrap: anywhere; }
   .count { font-size: 12px; color: var(--muted); margin-left: auto; white-space: nowrap; }
@@ -108,8 +108,8 @@
 
   /* Columns stop growing so one busy repo doesn't stretch its row; the cards scroll instead.
      520px keeps at least 4 cards in view on short screens, even with 3-line titles and a wrapped meta line. */
-  .cards { list-style: none; margin: 0; padding: 4px 8px 0; display: grid; gap: 8px; max-height: max(60vh, 520px); overflow-y: auto; }
-  .card { display: grid; grid-template-columns: 18px 1fr; gap: 9px; padding: 9px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+  .cards { list-style: none; margin: 0; padding: 4px 8px 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; max-height: max(60vh, 520px); overflow-y: auto; }
+  .card { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 9px; padding: 9px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
   .card .s:hover { text-decoration: none; }
   .card.draft { opacity: 0.62; }
   .t { font-size: 13.5px; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere; }
