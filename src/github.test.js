@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCategories, uniqueRepos, boardQuery, mapBoard, splitRuns } from './github.js';
+import { parseCategories, uniqueRepos, boardQuery, mapBoard, groupRuns } from './github.js';
 
 test('parses category lines and reports bad ones by line number', () => {
   const text = 'Backend: acme/api, acme/worker, acme/api,\n\nFrontend:acme/web\nno colon\nOps: acme infra\nEmpty:';
@@ -48,15 +48,18 @@ test('maps aliases back to repos, keeps per-repo errors, maps CI states, keeps t
   assert.throws(() => mapBoard(['acme/api'], { errors: [{ message: 'API rate limit exceeded' }] }), /rate limit/);
 });
 
-test('splits runs into running (oldest first) and the 10 newest finished, minus skipped', () => {
+test('groups runs by repo: running (oldest first) then newest finished, 10 per repo, no skipped', () => {
   const at = (m) => `2026-09-01T10:${String(m).padStart(2, '0')}:00Z`;
+  const r = (full_name) => ({ repository: { full_name } });
   const runs = [
-    { id: 'q', status: 'queued', created_at: at(50), updated_at: at(50) },
-    { id: 'p', status: 'in_progress', created_at: at(40), updated_at: at(45) },
-    { id: 's', status: 'completed', conclusion: 'skipped', created_at: at(55), updated_at: at(55) },
-    ...Array.from({ length: 12 }, (_, i) => ({ id: i, status: 'completed', created_at: at(i), updated_at: at(i + 1) })),
+    { id: 'q', status: 'queued', created_at: at(50), updated_at: at(50), ...r('acme/web') },
+    { id: 'p', status: 'in_progress', created_at: at(40), updated_at: at(45), ...r('acme/web') },
+    { id: 's', status: 'completed', conclusion: 'skipped', created_at: at(55), updated_at: at(55), ...r('acme/web') },
+    ...Array.from({ length: 12 }, (_, i) => ({ id: i, status: 'completed', created_at: at(i), updated_at: at(i + 1), ...r('acme/web') })),
+    { id: 'api', status: 'completed', conclusion: 'success', created_at: at(5), updated_at: at(6), ...r('acme/api') },
   ];
-  const { running, finished } = splitRuns(runs);
-  assert.deepEqual(running.map((w) => w.id), ['p', 'q']);
-  assert.deepEqual(finished.map((w) => w.id), [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const groups = groupRuns(runs);
+  assert.deepEqual(groups.map((g) => g.repo), ['acme/api', 'acme/web']);
+  assert.deepEqual(groups[0].runs.map((w) => w.id), ['api']);
+  assert.deepEqual(groups[1].runs.map((w) => w.id), ['p', 'q', 11, 10, 9, 8, 7, 6, 5, 4]);
 });

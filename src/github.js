@@ -108,15 +108,27 @@ export async function fetchBoard(token, repos) {
   return mapBoard(repos, body);
 }
 
-// Running: oldest first, so rows keep their place as new runs arrive.
-// Finished: newest 10, minus "skipped" runs, which comment-triggered workflows produce in bulk.
-export function splitRuns(runs) {
-  const running = runs.filter((w) => w.status !== 'completed').sort((a, b) => a.created_at.localeCompare(b.created_at));
-  const finished = runs
-    .filter((w) => w.status === 'completed' && w.conclusion !== 'skipped')
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-    .slice(0, 10);
-  return { running, finished };
+// One group per repo: running first (oldest first, so rows keep their place), then the
+// newest finished, capped at 10 rows. "skipped" runs are dropped — comment-triggered
+// workflows produce them in bulk.
+export function groupRuns(runs) {
+  const byRepo = new Map();
+  for (const w of runs) {
+    const repo = w.repository.full_name;
+    if (!byRepo.has(repo)) byRepo.set(repo, []);
+    byRepo.get(repo).push(w);
+  }
+  return [...byRepo]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([repo, all]) => ({
+      repo,
+      runs: [
+        ...all.filter((w) => w.status !== 'completed').sort((a, b) => a.created_at.localeCompare(b.created_at)),
+        ...all
+          .filter((w) => w.status === 'completed' && w.conclusion !== 'skipped')
+          .sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+      ].slice(0, 10),
+    }));
 }
 
 export async function fetchRuns(token, repos) {
@@ -129,7 +141,7 @@ export async function fetchRuns(token, repos) {
     else if (res.reason.status === 401 || res.reason.rate) throw res.reason;
     else errors.push(res.reason.status === 404 ? unreadable(repos[i]) : `${repos[i]}: ${res.reason.message}`);
   });
-  return { ...splitRuns(runs), errors };
+  return { groups: groupRuns(runs), errors };
 }
 
 // Calls fn now and again `ms` after each call settles. Pauses while the tab is hidden.
