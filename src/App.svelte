@@ -1,7 +1,8 @@
 <script>
   import Board from './Board.svelte';
   import Runs from './Runs.svelte';
-  import { parseCategories, uniqueRepos, fetchBoard, fetchRuns, poll, ago } from './github.js';
+  import Search from './Search.svelte';
+  import { parseCategories, uniqueRepos, fetchBoard, fetchRuns, searchPrs, poll, ago } from './github.js';
 
   const REFRESH_MS = 30_000;
   const TOKEN_KEY = 'pullboard.token';
@@ -29,6 +30,36 @@
   let draftToken = $state(savedToken);
   let draftCats = $state(savedCats);
   let formErrors = $state([]);
+
+  // Search replaces the view while query is set; result is null while a search runs.
+  let searchText = $state('');
+  let query = $state('');
+  let result = $state.raw(null);
+  let searchId = 0;
+
+  async function search(e) {
+    e.preventDefault();
+    const text = searchText.trim();
+    if (!text) return clearSearch();
+    const id = ++searchId;
+    query = text;
+    result = null;
+    error = '';
+    try {
+      const r = await searchPrs(token, repos, text);
+      if (id === searchId) result = r;
+    } catch (err) {
+      if (id !== searchId) return;
+      error = err.status ? describe(err) : err.message;
+      query = '';
+    }
+  }
+
+  function clearSearch() {
+    searchId++;
+    searchText = query = '';
+    result = null;
+  }
 
   $effect(() => {
     const t = setInterval(() => (now = Date.now()), 1000);
@@ -88,9 +119,14 @@
 <header class="bar">
   <strong class="brand">Pullboard</strong>
   <nav class="tabs">
-    <a href="#/" class:on={view === 'board'} aria-current={view === 'board' ? 'page' : undefined}>Board</a>
-    <a href="#/runs" class:on={view === 'runs'} aria-current={view === 'runs' ? 'page' : undefined}>Runs</a>
+    <a href="#/" onclick={clearSearch} class:on={view === 'board'} aria-current={view === 'board' ? 'page' : undefined}>Board</a>
+    <a href="#/runs" onclick={clearSearch} class:on={view === 'runs'} aria-current={view === 'runs' ? 'page' : undefined}>Runs</a>
   </nav>
+  <form class="search" role="search" onsubmit={search}>
+    <input type="search" bind:value={searchText} oninput={() => !searchText && clearSearch()}
+      onkeydown={(e) => e.key === 'Escape' && clearSearch()}
+      placeholder="Search PRs in all repos" aria-label="Search pull requests in all repos" disabled={!token || !repos.length} />
+  </form>
   <div class="right">
     {#if updated}<span>Updated {ago(updated, now)} ago</span>{/if}
     <button onclick={() => refresh()} disabled={!token || !repos.length}>↻ Refresh</button>
@@ -126,8 +162,9 @@
   {#if error}<p class="err banner" role="alert">{error}</p>{/if}
   {#if token && repos.length}
     <!-- Board stays mounted so collapsed rows survive a trip to Runs. -->
-    <div hidden={view !== 'board'}><Board {categories} data={board} {now} /></div>
-    {#if view === 'runs'}<Runs data={runs} {now} />{/if}
+    {#if query}<Search {result} {now} />{/if}
+    <div hidden={query || view !== 'board'}><Board {categories} data={board} {now} {token} /></div>
+    {#if view === 'runs' && !query}<Runs data={runs} {now} />{/if}
   {/if}
 </main>
 
@@ -142,6 +179,11 @@
   .tabs a { padding: 4px 10px; border-radius: 6px; color: var(--muted); font-weight: 500; }
   .tabs a:hover { text-decoration: none; color: var(--ink); }
   .tabs a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .search { flex: 1 1 200px; max-width: 360px; }
+  .search input {
+    width: 100%; font: inherit; font-size: 13px; color: var(--ink); background: var(--ground);
+    border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px;
+  }
   .right { margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; }
   button {
     font: inherit; font-size: 12.5px; color: var(--ink); background: var(--surface);

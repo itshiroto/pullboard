@@ -41,17 +41,50 @@ async function gh(token, path, init = {}) {
   throw err;
 }
 
-const PRS = `pullRequests(states: OPEN, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
-    totalCount
-    nodes {
-      number title url isDraft updatedAt baseRefName headRefName
-      author { login }
-      commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
-    }
-  }
-  closed: pullRequests(states: [CLOSED, MERGED], first: 10, orderBy: {field: UPDATED_AT, direction: DESC}) {
+const closedField = (after) => `pullRequests(states: [CLOSED, MERGED], first: 10${after ? `, after: ${JSON.stringify(after)}` : ''}, orderBy: {field: UPDATED_AT, direction: DESC}) {
+    pageInfo { hasNextPage endCursor }
     nodes { number title url state closedAt baseRefName headRefName author { login } }
   }`;
+
+const PR_FIELDS = `number title url isDraft updatedAt baseRefName headRefName
+      author { login }
+      commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`;
+
+const mapPr = (n) => ({
+  number: n.number,
+  title: n.title,
+  url: n.url,
+  draft: n.isDraft,
+  updatedAt: n.updatedAt,
+  author: n.author?.login ?? 'ghost',
+  base: n.baseRefName,
+  head: n.headRefName,
+  ci: CI[n.commits.nodes[0]?.commit.statusCheckRollup?.state] ?? 'none',
+});
+
+const PRS = `pullRequests(states: OPEN, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
+    totalCount
+    nodes { ${PR_FIELDS} }
+  }
+  closed: ${closedField()}`;
+
+// GitHub can't order PRs by close time, so each page is the 10 most recently active closed ones, sorted by close time.
+// ponytail: order is exact within a page, not across pages; a PR closed long after its last activity can sit a page late.
+function mapClosed(conn) {
+  const prs = conn.nodes
+    .map((n) => ({
+      number: n.number,
+      title: n.title,
+      url: n.url,
+      merged: n.state === 'MERGED',
+      closedAt: n.closedAt,
+      author: n.author?.login ?? 'ghost',
+      base: n.baseRefName,
+      head: n.headRefName,
+    }))
+    .sort((a, b) => b.closedAt.localeCompare(a.closedAt));
+  return { prs, cursor: conn.pageInfo.hasNextPage ? conn.pageInfo.endCursor : null };
+}
 
 // One aliased field per repo (r0, r1, ...) so the whole board is one request.
 // Names are already checked against REPO; JSON.stringify makes them GraphQL string literals.
@@ -63,7 +96,7 @@ export function boardQuery(repos) {
   return `query {\n${fields.join('\n')}\n}`;
 }
 
-// -> { "owner/repo": { total, prs: [...], closed: [...] } | { error } }
+// -> { "owner/repo": { total, prs: [...], closed: [...], closedCursor } | { error } }
 export function mapBoard(repos, body) {
   if (!body.data) throw new Error(body.errors?.[0]?.message ?? 'GitHub returned no data.');
   return Object.fromEntries(
@@ -73,32 +106,9 @@ export function mapBoard(repos, body) {
         const err = body.errors?.find((e) => e.path?.[0] === `r${i}`);
         return [repo, { error: !err || err.type === 'NOT_FOUND' ? unreadable(repo) : err.message }];
       }
-      const prs = r.pullRequests.nodes.map((n) => ({
-        number: n.number,
-        title: n.title,
-        url: n.url,
-        draft: n.isDraft,
-        updatedAt: n.updatedAt,
-        author: n.author?.login ?? 'ghost',
-        base: n.baseRefName,
-        head: n.headRefName,
-        ci: CI[n.commits.nodes[0]?.commit.statusCheckRollup?.state] ?? 'none',
-      }));
-      // GitHub can't order PRs by close time, so take the 10 most recently active closed ones and keep the 5 closed last.
-      const closed = r.closed.nodes
-        .map((n) => ({
-          number: n.number,
-          title: n.title,
-          url: n.url,
-          merged: n.state === 'MERGED',
-          closedAt: n.closedAt,
-          author: n.author?.login ?? 'ghost',
-          base: n.baseRefName,
-          head: n.headRefName,
-        }))
-        .sort((a, b) => b.closedAt.localeCompare(a.closedAt))
-        .slice(0, 5);
-      return [repo, { total: r.pullRequests.totalCount, prs, closed }];
+      const prs = r.pullRequests.nodes.map(mapPr);
+      const { prs: closed, cursor: closedCursor } = mapClosed(r.closed);
+      return [repo, { total: r.pullRequests.totalCount, prs, closed, closedCursor }];
     }),
   );
 }
@@ -106,6 +116,54 @@ export function mapBoard(repos, body) {
 export async function fetchBoard(token, repos) {
   const body = await gh(token, '/graphql', { method: 'POST', body: JSON.stringify({ query: boardQuery(repos) }) });
   return mapBoard(repos, body);
+}
+
+// Next page of a repo's closed PRs -> { prs, cursor }; cursor is null on the last page.
+export async function fetchClosed(token, repo, after) {
+  const [owner, name] = repo.split('/');
+  const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { ${closedField(after)} } }`;
+  const body = await gh(token, '/graphql', { method: 'POST', body: JSON.stringify({ query }) });
+  if (!body.data?.repository) throw new Error(body.errors?.[0]?.message ?? 'GitHub returned no data.');
+  return mapClosed(body.data.repository.pullRequests);
+}
+
+// GitHub caps a search query at 256 characters, so repos are split across as many
+// aliased searches as needed, all in one request. The text can hold qualifiers too (author:mira).
+export function searchQuery(repos, text) {
+  const base = `is:pr ${text.trim()}`;
+  const chunks = [];
+  for (const r of repos) {
+    const last = chunks.at(-1);
+    if (last && `${last} repo:${r}`.length <= 256) chunks[chunks.length - 1] = `${last} repo:${r}`;
+    else chunks.push(`${base} repo:${r}`);
+  }
+  if (chunks.some((c) => c.length > 256)) throw new Error('Search text is too long.');
+  const fields = chunks.map(
+    (q, i) => `  s${i}: search(query: ${JSON.stringify(q)}, type: ISSUE, first: 50) {
+    issueCount
+    nodes { ... on PullRequest { ${PR_FIELDS} state closedAt repository { nameWithOwner } } }
+  }`,
+  );
+  return `query {\n${fields.join('\n')}\n}`;
+}
+
+// -> { total, prs: [...] } newest activity first. state is open, merged or closed.
+// ponytail: 50 results per chunk of repos; the rest are counted in total but not shown. Page with cursors if that bites.
+export function mapSearch(body) {
+  if (!body.data) throw new Error(body.errors?.[0]?.message ?? 'GitHub returned no data.');
+  const results = Object.values(body.data);
+  return {
+    total: results.reduce((n, r) => n + r.issueCount, 0),
+    prs: results
+      .flatMap((r) => r.nodes)
+      .map((n) => ({ ...mapPr(n), repo: n.repository.nameWithOwner, state: n.state.toLowerCase(), closedAt: n.closedAt }))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+  };
+}
+
+export async function searchPrs(token, repos, text) {
+  const body = await gh(token, '/graphql', { method: 'POST', body: JSON.stringify({ query: searchQuery(repos, text) }) });
+  return mapSearch(body);
 }
 
 // One group per repo: running first (oldest first, so rows keep their place), then the
